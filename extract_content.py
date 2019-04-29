@@ -118,6 +118,53 @@ def delete_escape(target: str) -> str:
 def delete_tag(html: str) -> str:
   p = re.compile(r"<[^>]*?>")
   return p.sub("", html)
+
+# 空白削除
+def delete_empty(target: str) -> str:
+  return target.replace(" ", "")
+
+# ______________________________________________________________________________________________
+#
+# 見た目変更系
+# -----------------
+
+# コンソール出力時の色を付与するクラス
+class pycolor:
+  BLACK = '\033[30m'
+  RED = '\033[31m'
+  GREEN = '\033[32m'
+  YELLOW = '\033[33m'
+  BLUE = '\033[34m'
+  PURPLE = '\033[35m'
+  CYAN = '\033[36m'
+  WHITE = '\033[37m'
+  END = '\033[0m'
+  BOLD = '\038[1m'
+  UNDERLINE = '\033[4m'
+  INVISIBLE = '\033[08m'
+  REVERCE = '\033[07m'
+  
+  @classmethod
+  def paint(self, target: str, color: str) -> str:
+    return f"{color}{target}{pycolor.END}"
+  
+  @classmethod
+  def print_red(self, target: str):
+    print(pycolor.paint(target, pycolor.RED))
+  
+  @classmethod
+  def print_green(self, target: str):
+    print(pycolor.paint(target, pycolor.GREEN))
+  
+  @classmethod
+  def print_yellow(self, target: str):
+    print(pycolor.paint(target, pycolor.YELLOW))
+  
+  @classmethod
+  def print_blue(self, target: str):
+    print(pycolor.paint(target, pycolor.BLUE))
+
+
 # ______________________________________________________________________________________________
 #
 # 検索系
@@ -239,9 +286,8 @@ def is_res_ng(res):
 # メイン処理系
 # -----------------
 
-
 # 引数のURLのページにアクセス、メインコンテンツらしき文章を抽出する
-def extract_content(url: str) -> str:
+def extract_content_by_readability(url: str) -> str:
   h = {
       "User-Agent": "Mozilla/5.0 (Linux; U; Android 4.1.2; ja-jp; SC-06D Build/JZO54K) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"}
   res = requests.get(url, headers=h, verify=False)
@@ -256,11 +302,11 @@ def extract_content(url: str) -> str:
   
   html = res.text
   article = Document(html).summary()
-  print(article)
-  return article
+  text = delete_tag(article)
+  return text
 
 # extractContent3で同上の処理を行う
-def extract_content_3(url: str) -> str:
+def extract_content_by_ec3(url: str) -> str:
   h = {
       "User-Agent": "Mozilla/5.0 (Linux; U; Android 4.1.2; ja-jp; SC-06D Build/JZO54K) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"}
   res = requests.get(url, headers=h, verify=False)
@@ -278,23 +324,42 @@ def extract_content_3(url: str) -> str:
   # extractContent3
   extractor = ExtractContent()
   
-  # オプション値を指定する
+  # HTML分析
   extractor.analyse(html)
   text, title = extractor.as_text()
-  html, title = extractor.as_html()
-  title = extractor.extract_title(html)
-  print(text)
-  print("")
-  print(html)
   return text
+
+def extract_content_app():
+
+  # 全件URLリスト
+  urlList = None
+  if search_engine == 1:
+    urlList = get_url_tag_list_up_to_specified_number(search_keyword, number_of_pages, exclusion_domain_list)
+  elif search_engine == 2:
+    urlList = search_by_yahoo_up_to_specified_number(search_keyword, number_of_pages, exclusion_domain_list)
+  elif search_engine == 3:
+    urlList = search_by_bing_up_to_specified_number(search_keyword, number_of_pages, exclusion_domain_list)
+  
+  # URLのリストに基づいてページにアクセスし、本文を抽出する
+  for u_tag in urlList:
+    url = u_tag['href']
+    print("")
+    pycolor.print_green(url)
+    pycolor.print_green("--------------------\n")
+    # text_r = write_wakati(extract_content_by_readability(url))
+    # text_ec3 = write_wakati(extract_content_by_ec3(url))
+    text_r = delete_empty(extract_content_by_readability(url))
+    text_ec3 = delete_empty(extract_content_by_ec3(url))
+    
+    pycolor.print_red("library: readability")
+    pycolor.print_red(text_r)
+    print("")
+    pycolor.print_blue("library: extract_content_3")
+    pycolor.print_blue(text_ec3)
+    print("")
 
 #_________________________________________________
 #
 #実行処理
 #-----------------------------
-# # article = extract_content(r'https://travel.rakuten.co.jp/mytrip/ranking/spot-tokyo/')
-# article = extract_content(r'https://macaro-ni.jp/30147')
-# print(article)
-
-# extract_content_3(r'https://macaro-ni.jp/30147')
-
+extract_content_app()
