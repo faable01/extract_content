@@ -172,7 +172,7 @@ class pycolor:
 
 # Googleで検索する（キーワードとstart位置を指定してGoogle検索結果のURLのタグのリストを返却する関数）
 def get_url_tag_list(keyword, start):
-  url = 'https://www.google.co.jp/search'
+  url = 'http://www.google.co.jp/search'
   headers = {
       "User-Agent": "Mozilla/5.0 (Linux; U; Android 4.1.2; ja-jp; SC-06D Build/JZO54K) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"}
   # URLパラメータ作成：tbm: 検索パターンの指定, start: 検索をスタートする開始位置
@@ -188,7 +188,7 @@ def get_url_tag_list(keyword, start):
 
 # Yahoo!で検索する
 def search_by_yahoo(keyword, start):
-  url = 'https://search.yahoo.co.jp/search'
+  url = 'http://search.yahoo.co.jp/search'
   headers = {
       "User-Agent": "Mozilla/5.0 (Linux; U; Android 4.1.2; ja-jp; SC-06D Build/JZO54K) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"}
   search_params = {"ei": "UTF-8", "fr": "top_smf",
@@ -205,7 +205,7 @@ def search_by_yahoo(keyword, start):
 
 # bingで検索する https://www.bing.com/search?q=python&form=QBLH
 def search_by_bing(keyword, start):
-  url = "https://www.bing.com/search"
+  url = "http://www.bing.com/search"
   headers = {
       "User-Agent": "Mozilla/5.0 (Linux; U; Android 4.1.2; ja-jp; SC-06D Build/JZO54K) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"}
   search_params = {"q": keyword, "form": "QBLH", "first": start}
@@ -286,51 +286,9 @@ def is_res_ng(res):
 # メイン処理系
 # -----------------
 
-# 引数のURLのページにアクセス、メインコンテンツらしき文章を抽出する
-def extract_content_by_readability(url: str) -> str:
-  h = {
-      "User-Agent": "Mozilla/5.0 (Linux; U; Android 4.1.2; ja-jp; SC-06D Build/JZO54K) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"}
-  res = requests.get(url, headers=h, verify=False)
-  
-  # WEBページの文字コードを推測
-  res.encoding = res.apparent_encoding
-  if res.encoding != 'UTF-8' and res.encoding != 'utf-8':
-    print(f'UTF-8以外の文字コードを検出：{res.encoding}')
-    if res.encoding == 'Windows-1254':
-      print('誤りだと思われる文字コード(Windows-1254)を検出しました。UTF-8に変換します。')
-      res.encoding = 'UTF-8'
-  
-  html = res.text
-  article = Document(html).summary()
-  text = delete_tag(article)
-  return text
-
-# extractContent3で同上の処理を行う
-def extract_content_by_ec3(url: str) -> str:
-  h = {
-      "User-Agent": "Mozilla/5.0 (Linux; U; Android 4.1.2; ja-jp; SC-06D Build/JZO54K) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"}
-  res = requests.get(url, headers=h, verify=False)
-  
-  # WEBページの文字コードを推測
-  res.encoding = res.apparent_encoding
-  if res.encoding != 'UTF-8' and res.encoding != 'utf-8':
-    print(f'UTF-8以外の文字コードを検出：{res.encoding}')
-    if res.encoding == 'Windows-1254':
-      print('誤りだと思われる文字コード(Windows-1254)を検出しました。UTF-8に変換します。')
-      res.encoding = 'UTF-8'
-  
-  html = res.text
-  
-  # extractContent3
-  extractor = ExtractContent()
-  
-  # HTML分析
-  extractor.analyse(html)
-  text, title = extractor.as_text()
-  return text
-
-def extract_content_app():
-
+# ユーザが指定した番号に応じた検索エンジンで検索を行う
+# 外部依存：search_engine
+def get_urlList_by_user_selected():
   # 全件URLリスト
   urlList = None
   if search_engine == 1:
@@ -339,18 +297,135 @@ def extract_content_app():
     urlList = search_by_yahoo_up_to_specified_number(search_keyword, number_of_pages, exclusion_domain_list)
   elif search_engine == 3:
     urlList = search_by_bing_up_to_specified_number(search_keyword, number_of_pages, exclusion_domain_list)
+  return urlList
+
+# 例外を考慮した通信処理
+def get_res(url: str) -> requests.models.Response:
   
+  # 取得したURLにアクセス
+  h = {
+      "User-Agent": "Mozilla/5.0 (Linux; U; Android 4.1.2; ja-jp; SC-06D Build/JZO54K) AppleWebKit/534.30 (KHTML, like Gecko) Version/4.0 Mobile Safari/534.30"}
+    
+  # 通信実行（例外時はtracebackを出力して関数を終了する）
+  try:
+    url.replace("https", "http")
+    res = requests.get(url, headers=h, verify=False)
+  except:
+    print("通信時例外発生_例外詳細：")
+    # traceback詳細出力
+    import traceback
+    traceback.print_exc()
+    return False
+  
+  # 通信結果が異常
+  if is_res_ng(res):
+    return False
+  
+  # WEBページの文字コードを推測
+  res.encoding = res.apparent_encoding
+  if res.encoding != 'UTF-8' and res.encoding != 'utf-8':
+    print(f'UTF-8以外の文字コードを検出：{res.encoding}')
+    if res.encoding == 'Windows-1254':
+      print('誤りだと思われる文字コード(Windows-1254)を検出しました。UTF-8に変換します。')
+      res.encoding = 'UTF-8'
+  
+  return res
+
+# 引数のURLのページにアクセス、メインコンテンツらしき文章を抽出する
+def extract_content_by_readability(url: str) -> str:
+  res = get_res(url)
+  html = res.text
+  return extract_content_from_html_by_readability(html)
+
+# extractContent3で同上の処理を行う
+def extract_content_by_ec3(url: str) -> str:
+  res = get_res(url)
+  html = res.text
+  return extract_content_from_html_by_ec3(html)
+
+# HTMLのテキストからコンテンツ本文を取得する(readabilityを利用)
+def extract_content_from_html_by_readability(html: str) -> str:
+  article = Document(html).summary()
+  text = delete_tag(article)
+  return text
+
+# HTMLのテキストからコンテンツ本文を取得する(extract_content_3を利用)
+def extract_content_from_html_by_ec3(html: str) -> str:
+  # extractContent3
+  extractor = ExtractContent()
+  # HTML分析
+  extractor.analyse(html)
+  text, title = extractor.as_text()
+  return text
+
+# optionを指定してコンテンツ本文を取得する（extractcontent3を利用）
+def extract_content_from_html_by_ec3_according_to_option(html: str, option: dict) -> str:
+  # extractContent3
+  extractor = ExtractContent()
+  # オプション値を指定する
+  extractor.set_option(option)
+  # HTML分析
+  extractor.analyse(html)
+  text, title = extractor.as_text()
+  return text
+
+# extractcontent3用のオプションを作成する
+def create_option_for_ec3(threshold=100, min_length=80, decay_factor=0.73, continuous_factor=1.62, punctuation_weight=10) -> dict:
+  """
+  オプションの種類:
+  名称 / デフォルト値
+  
+  threshold / 100
+  本文と見なすスコアの閾値
+  
+  min_length / 80
+  評価を行うブロック長の最小値
+  
+  decay_factor / 0.73
+  減衰係数
+  小さいほど先頭に近いブロックのスコアが高くなります
+  
+  continuous_factor / 1.62
+  連続ブロック係数
+  大きいほどブロックを連続と判定しにくくなる
+  
+  punctuation_weight / 10
+  句読点に対するスコア
+  大きいほど句読点が存在するブロックを本文と判定しやすくなる
+  """
+  option = {
+    "threshold": threshold,
+    "min_length": min_length,
+    "decay_factor": decay_factor,
+    "continuous_factor": continuous_factor,
+    "punctuation_weight": punctuation_weight
+  }
+  return option
+
+
+# 本文抽出実行処理(redabilityとextractcontent3の比較)
+def extract_content_app():
+
+  # 全件URLリスト
+  urlList = get_urlList_by_user_selected()
+
   # URLのリストに基づいてページにアクセスし、本文を抽出する
   for u_tag in urlList:
     url = u_tag['href']
+
     print("")
     pycolor.print_green(url)
     pycolor.print_green("--------------------\n")
-    # text_r = write_wakati(extract_content_by_readability(url))
-    # text_ec3 = write_wakati(extract_content_by_ec3(url))
-    text_r = delete_empty(extract_content_by_readability(url))
-    text_ec3 = delete_empty(extract_content_by_ec3(url))
     
+    res = get_res(url)
+    if not res:
+      print("次ページに処理を移行します")
+      continue
+    
+    html = res.text
+    text_r = delete_empty(extract_content_from_html_by_readability(html))
+    text_ec3 = delete_empty(extract_content_from_html_by_ec3(html))
+
     pycolor.print_red("library: readability")
     pycolor.print_red(text_r)
     print("")
@@ -358,8 +433,55 @@ def extract_content_app():
     pycolor.print_blue(text_ec3)
     print("")
 
+
+# 本文抽出実行処理（extractcontent3のオプション比較）
+def extract_content_app_for_comparison_options():
+
+  # 全件URLリスト
+  urlList = get_urlList_by_user_selected()
+
+  # URLのリストに基づいてページにアクセスし、本文を抽出する
+  for u_tag in urlList:
+    url = u_tag['href']
+
+    print("")
+    pycolor.print_green(url)
+    pycolor.print_green("--------------------\n")
+    
+    res = get_res(url)
+    if not res:
+      print("次ページに処理を移行します")
+      continue
+    
+    html = res.text
+
+    option1 = create_option_for_ec3(10, 80, 1.00, 1.00, 0)
+    option2 = create_option_for_ec3(10, 80, 1.00, 1.00, 10) # 有力候補
+    option3 = create_option_for_ec3(10, 80, 1.00, 1.00, 20)
+    option4 = create_option_for_ec3(10, 80, 1.00, 1.00, 30)
+
+    t1 = delete_empty(extract_content_from_html_by_ec3_according_to_option(html, option1))
+    t2 = delete_empty(extract_content_from_html_by_ec3_according_to_option(html, option2))
+    t3 = delete_empty(extract_content_from_html_by_ec3_according_to_option(html, option3))
+    t4 = delete_empty(extract_content_from_html_by_ec3_according_to_option(html, option4))
+
+    pycolor.print_red("option1")
+    pycolor.print_red(t1)
+    print("")
+    pycolor.print_blue("option2")
+    pycolor.print_blue(t2)
+    print("")
+    pycolor.print_red("option3")
+    pycolor.print_red(t3)
+    print("")
+    pycolor.print_blue("option4")
+    pycolor.print_blue(t4)
+    print("")
+
+
 #_________________________________________________
 #
 #実行処理
 #-----------------------------
-extract_content_app()
+
+extract_content_app_for_comparison_options()
